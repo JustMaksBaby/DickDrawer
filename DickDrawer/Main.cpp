@@ -2,10 +2,38 @@
 
 
 const char* CLASS_NAME = "DickDrawClass";
-
+bool END_PROG = false;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+
+	switch (msg)
+	{
+	//case WM_KEYDOWN: 
+	//{
+	//	if (wParam == VK_ESCAPE)
+	//	{
+	//		SendMessage(hWnd, WM_CLOSE, 0, 0); 
+	//	}
+	//}break;
+	/*case WM_CLOSE: 
+	{
+		int answer = MessageBox(hWnd, "Do you want to close the prorgam?", "EXIT", MB_ICONWARNING | MB_YESNO);
+		
+		if (answer == IDYES)
+		{
+			END_PROG = true;
+			DestroyWindow(hWnd);
+		}
+
+		return 0; 
+	}break;*/
+	case WM_DESTROY: 
+	{
+		PostQuitMessage(0); 
+	}break;
+	}
+
 	return DefWindowProc(hWnd, msg, wParam, lParam); 
 }
 
@@ -64,15 +92,23 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int sh
 	HWND hWnd = Init(hInst, 400,500); 
 
 
-	MSG msg; 
-	while (GetMessage(&msg, hWnd, 0, 0))
+	MSG msg;
+
+	while (!END_PROG)
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			if (msg.message == WM_QUIT)
+			{
+				END_PROG = true;
+				break;
+			}
+
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
 	}
-
 	
-
 
 
 
