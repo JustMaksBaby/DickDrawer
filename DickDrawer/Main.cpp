@@ -62,16 +62,16 @@ void ResizeDBISection(BitmapBuffer* buffer, int Width, int Height)
 }
 
 void DisplayBuffer(HDC hDc,
-	int windowWidth, int windowHeight,
+	 int width, int height,
 	BitmapBuffer* buffer)
 {
 	//copy data from buffer to DC
 
 	StretchDIBits(hDc, 
-		          0, 0, windowWidth, windowHeight,
-		          0, 0, buffer->Width, buffer->Height, 
+		          0,0, width, height,
+		          0,0, width, height,
 		          buffer->Memory,
-		          &(buffer->Info), 
+		          &(buffer->Info),
 		          DIB_RGB_COLORS, 
 		          SRCCOPY); 
 }
@@ -100,8 +100,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT: 
 	{
 		PAINTSTRUCT ps;
+		//InvalidateRect(hWnd, nullptr, FALSE); 
+
 		HDC hDc = BeginPaint(hWnd, &ps);
-		DisplayBuffer(hDc, ps.rcPaint.right, ps.rcPaint.bottom, &BACK_BUFFER);
+		DisplayBuffer(hDc,  ps.rcPaint.right, ps.rcPaint.bottom,  &BACK_BUFFER);
 		EndPaint(hWnd, &ps);
 	} break;
 	case WM_SIZE:
@@ -194,7 +196,7 @@ HWND Init(HINSTANCE hInst, UINT width, UINT height)
 		hWnd = CreateWindow(
 			CLASS_NAME,
 			"DickDraw",
-			WS_OVERLAPPED|WS_SYSMENU|WS_SIZEBOX|WS_MAXIMIZEBOX|WS_MINIMIZEBOX,
+			WS_OVERLAPPED|WS_SYSMENU,
 			100, 100,
 			width, height,
 			0,
@@ -213,7 +215,7 @@ HWND Init(HINSTANCE hInst, UINT width, UINT height)
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int showMode)
 {
 
-	HWND hWnd = Init(hInst, 400,500); 
+	HWND hWnd = Init(hInst, 800,500); 
 
 
 	MSG msg;
@@ -226,16 +228,14 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int sh
 			DispatchMessage(&msg);
 		}
 		
+
 		HDC hDc = GetDC(hWnd);
 
-		RECT clienRect; 
+		RECT clientRect; 
+		GetClientRect(hWnd, &clientRect); 
 
-		GetClientRect(hWnd, &clienRect); 
-		int width = clienRect.right; 
-		int height = clienRect.bottom; 
-
-		//TODO check it inside WM_MOUSEMOVE;  
-		DisplayBuffer(hDc, width, height, &BACK_BUFFER); 
+		DisplayBuffer(hDc,clientRect.right, clientRect.bottom, &BACK_BUFFER); 
+		ReleaseDC(hWnd, hDc); 
 	}
 	
 
