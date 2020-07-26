@@ -9,6 +9,12 @@ const char* CLASS_NAME = "DickDrawClass";
 // control program cyrcle
 bool END_PROG = false;
 
+// palete size
+global_var int PALETE_WIDTH  = 40; 
+global_var int PALETE_HEIGHT = 40; 
+
+// color for pen
+global_var COLORREF PEN_COLOR = RGB(255, 0, 0); 
 
 struct BitmapBuffer
 {
@@ -61,6 +67,48 @@ void ResizeDBISection(BitmapBuffer* buffer, int Width, int Height)
 	buffer->Pitch = Width * buffer->BytesPerPixel;
 }
 
+
+void ChangePixel(BitmapBuffer* buffer, UINT32 x, UINT32 y, COLORREF color)
+{
+	// set color for each pixel
+
+	UINT32* pixel = (UINT32*)buffer->Memory;
+	pixel += (y * (buffer->Pitch / buffer->BytesPerPixel)) + x;
+
+	UINT8 red = GetRValue(color);
+	UINT8 green = GetGValue(color);
+	UINT8 blue = GetBValue(color);
+
+	*pixel = (red << 16) | (green << 8) | blue;
+
+}
+void CreatePalete(BitmapBuffer* buffer)
+{
+	for (int y = 0; y < PALETE_HEIGHT; ++y)
+	{
+		for (int x = 0; x < PALETE_WIDTH; ++x)
+		{
+			if (y < 20 && x < 20)
+			{
+				ChangePixel(buffer, x, y, RGB(255, 0, 0)); 
+			}
+			else if (y < 40 && x < 20)
+			{
+				ChangePixel(buffer, x, y, RGB(0, 255, 0)); 
+			}
+			else if (y < 20 && x < 40)
+			{
+				ChangePixel(buffer, x, y, RGB(0, 0, 255)); 
+			}
+			else if (y < 40 && x < 40)
+			{
+				ChangePixel(buffer, x, y, RGB(255, 0, 255)); 
+			}
+		}
+	}
+}
+
+
 void DisplayBuffer(HDC hDc,
 	 int width, int height,
 	BitmapBuffer* buffer)
@@ -76,81 +124,96 @@ void DisplayBuffer(HDC hDc,
 		          SRCCOPY); 
 }
 
-
-void RenderFrame(BitmapBuffer* buffer, UINT32 x, UINT32 y,  COLORREF color)
-{
-	
-	UINT32 * pixel = (UINT32 *)buffer->Memory;
-	pixel += (y * (buffer->Pitch/ buffer->BytesPerPixel)) + x;
-
-	UINT8 red   = GetRValue(color);
-	UINT8 green = GetGValue(color); 
-	UINT8 blue  = GetBValue(color); 
-
-	*pixel = (red << 16) | (green << 8) | blue;
-
-}
-
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-
 	switch (msg)
 	{
 		
-	case WM_PAINT: 
-	{
-		PAINTSTRUCT ps;
-		//InvalidateRect(hWnd, nullptr, FALSE); 
-
-		HDC hDc = BeginPaint(hWnd, &ps);
-		DisplayBuffer(hDc,  ps.rcPaint.right, ps.rcPaint.bottom,  &BACK_BUFFER);
-		EndPaint(hWnd, &ps);
-	} break;
-	case WM_SIZE:
-	{
-		ResizeDBISection(&BACK_BUFFER, LOWORD(lParam), HIWORD(lParam)); 
-	}break;
-	case WM_KEYDOWN: 
-	{
-		if (wParam == VK_ESCAPE)
+		case WM_PAINT: 
 		{
-			PostMessage(hWnd, WM_CLOSE, 0, 0); 
-		}
-	}break;
-	case WM_MOUSEMOVE: 
-	{
-		if (wParam & MK_LBUTTON)
+			PAINTSTRUCT ps;
 
+			HDC hDc = BeginPaint(hWnd, &ps);
+
+			DisplayBuffer(hDc,  ps.rcPaint.right, ps.rcPaint.bottom,  &BACK_BUFFER);
+
+			EndPaint(hWnd, &ps);
+		} break;
+
+		case WM_SIZE:
 		{
-			HDC hdc = GetDC(hWnd);
-			unsigned int x = GET_X_LPARAM(lParam);
-			unsigned int y = GET_Y_LPARAM(lParam);
+			ResizeDBISection(&BACK_BUFFER, LOWORD(lParam), HIWORD(lParam)); 
+		}break;
+
+		case WM_KEYDOWN: 
+		{
+			if (wParam == VK_ESCAPE)
+			{
+				PostMessage(hWnd, WM_CLOSE, 0, 0); 
+			}
+		}break;
+		case WM_LBUTTONDOWN: 
+		{
+			UINT32 x = GET_X_LPARAM(lParam); 
+			UINT32 y = GET_Y_LPARAM(lParam); 
+
+			if (y < 20 && x < 20)
+			{
+				PEN_COLOR =  RGB(255, 0, 0);
+			}
+			else if (y < 40 && x < 20)
+			{
+				PEN_COLOR = RGB(0, 255, 0);
+			}
+			else if (y < 20 && x < 40)
+			{
+				PEN_COLOR = RGB(0, 0, 255);
+			}
+			else if (y < 40 && x < 40)
+			{
+				PEN_COLOR =RGB(255, 0, 255);
+			}
+
+		}break;
+		case WM_MOUSEMOVE: 
+		{
+			if (wParam & MK_LBUTTON)
+			{
+				unsigned int x = GET_X_LPARAM(lParam);
+				unsigned int y = GET_Y_LPARAM(lParam);
+				
+				//TODO change this system. Doesn`t allow to draw  in line with the palette 
+
+				// to not draw above the palette
+				if (x >= 40 && y >= 40)
+				{
+					ChangePixel(&BACK_BUFFER, x, y, PEN_COLOR);
+				} 
+			}
+			return 0;
+		}break;
+		case WM_CLOSE: 
+		{
+			int answer = MessageBox(hWnd, "Do you want to close the prorgam?", "EXIT", MB_ICONWARNING | MB_YESNO);
 			
-			RenderFrame(&BACK_BUFFER, x, y, RGB(255, 0, 0)); 
+			if (answer == IDYES)
+			{
+				END_PROG = true;
+				DestroyWindow(hWnd);
+			}
 
-			ReleaseDC(hWnd, hdc);
-		}
-		return 0;
-	}break;
-	case WM_CLOSE: 
-	{
-		int answer = MessageBox(hWnd, "Do you want to close the prorgam?", "EXIT", MB_ICONWARNING | MB_YESNO);
-		
-		if (answer == IDYES)
+			return 0; 
+		}break;
+		case WM_DESTROY: 
 		{
-			END_PROG = true;
-			DestroyWindow(hWnd);
-		}
+			PostQuitMessage(0);
+			return 0; 
+		}break;
 
-		return 0; 
-	}break;
-	case WM_DESTROY: 
-	{
-		PostQuitMessage(0);
-		return 0; 
-	}break;
-	default: 
-	{return DefWindowProc(hWnd, msg, wParam, lParam); } 
+		default: 
+		{
+			return DefWindowProc(hWnd, msg, wParam, lParam); 
+		} 
 
 	}
 
@@ -208,6 +271,8 @@ HWND Init(HINSTANCE hInst, UINT width, UINT height)
 
 	}
 
+	CreatePalete(&BACK_BUFFER); 
+
 	return hWnd; 
 
 }
@@ -232,6 +297,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int sh
 		HDC hDc = GetDC(hWnd);
 
 		RECT clientRect; 
+
 		GetClientRect(hWnd, &clientRect); 
 
 		DisplayBuffer(hDc,clientRect.right, clientRect.bottom, &BACK_BUFFER); 
