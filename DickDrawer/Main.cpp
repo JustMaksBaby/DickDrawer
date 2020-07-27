@@ -185,7 +185,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				//TODO change this system. Doesn`t allow to draw  in line with the palette 
 
 				// to not draw above the palette
-				if (x >= 40 && y >= 40)
+				if (x >= 40 || y >= 40)
 				{
 					ChangePixel(&BACK_BUFFER, x, y, PEN_COLOR);
 				} 
