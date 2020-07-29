@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <windowsx.h>
+#include <algorithm>
 
 #define global_var  static
 
@@ -20,8 +21,8 @@ struct BitmapBuffer
 {
 	BITMAPINFO  Info;
 	void* Memory;
-	int    Width;
-	int    Height;
+	int    Width  = 0 ;
+	int    Height = 0;
 	unsigned int    Pitch;
 	unsigned short	BytesPerPixel = 4;
 };
@@ -29,42 +30,55 @@ struct BitmapBuffer
 global_var BitmapBuffer BACK_BUFFER; 
 
 
-void ResizeDBISection(BitmapBuffer* buffer, int Width, int Height)
+void ResizeDBISection(BitmapBuffer* buffer, int newWidth, int newHeight)
 {
-	int NewBitmapMemorySize = (Width * Height) * buffer->BytesPerPixel;
+	int newBufferSize = newWidth * newHeight* buffer->BytesPerPixel;
+	int oldBufferSize = buffer->Height * buffer->Width * buffer->BytesPerPixel;
 
-	void* tempMemory = VirtualAlloc(0, NewBitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
-	if (buffer->Memory)
+
+	if (oldBufferSize < newBufferSize)
 	{
-		// allocate buffer with new size
-		
-		// copy old buffer`s data to new buffer; 
-		int oldBufferSize = buffer->Height * buffer->Width * buffer->BytesPerPixel; 
-		int bytesToCopy = oldBufferSize < NewBitmapMemorySize ? oldBufferSize : NewBitmapMemorySize; 
+		// allocate buffer with new size;
 
-		memcpy(tempMemory, buffer->Memory, bytesToCopy);
+		void* newMemory = VirtualAlloc(0, newBufferSize, MEM_COMMIT, PAGE_READWRITE);
 
-		// free old buffer
-		VirtualFree(buffer->Memory, 0, MEM_RELEASE);
-		
-		//make buffer memory point to new memory location
+		UINT8* tempMemory = (UINT8*)newMemory; 
+		UINT8* bufferTempMemory = (UINT8*)buffer->Memory; 
+
+		if (buffer->Memory)
+		{
+			UINT64 newPitch = (UINT64)newWidth * buffer->BytesPerPixel; 
+			// copy old buffer`s data to new buffer;
+			for (UINT64 y = 0; y < buffer->Height; ++y)
+			{
+				for (UINT64 x = 0; x < buffer->Width; ++x)
+				{
+					tempMemory[y * newPitch + x] = bufferTempMemory[y * buffer->Pitch + x]; 
+				}
+			} 
+
+			// free old buffer
+			VirtualFree(buffer->Memory, 0, MEM_RELEASE);
+
+			//make buffer memory point to new memory location
+		}
+
+		buffer->Memory = newMemory;
+		tempMemory = nullptr;
+		newMemory = nullptr;
+
+		buffer->Width = newWidth;
+		buffer->Height = newHeight;
+
+		buffer->Info.bmiHeader.biSize = sizeof(buffer->Info.bmiHeader);
+		buffer->Info.bmiHeader.biWidth = buffer->Width;
+		buffer->Info.bmiHeader.biHeight = -buffer->Height;
+		buffer->Info.bmiHeader.biPlanes = 1;
+		buffer->Info.bmiHeader.biBitCount = 32;
+		buffer->Info.bmiHeader.biCompression = BI_RGB;
+
+		buffer->Pitch = newWidth * buffer->BytesPerPixel;
 	}
-
-	buffer->Memory = tempMemory;
-	tempMemory = nullptr;
-
-	buffer->Width = Width;
-	buffer->Height = Height;
-	buffer->BytesPerPixel = 4;
-
-	buffer->Info.bmiHeader.biSize = sizeof(buffer->Info.bmiHeader);
-	buffer->Info.bmiHeader.biWidth = buffer->Width;
-	buffer->Info.bmiHeader.biHeight = -buffer->Height;
-	buffer->Info.bmiHeader.biPlanes = 1;
-	buffer->Info.bmiHeader.biBitCount = 32;
-	buffer->Info.bmiHeader.biCompression = BI_RGB;
-
-	buffer->Pitch = Width * buffer->BytesPerPixel;
 }
 
 
@@ -142,6 +156,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		case WM_SIZE:
 		{
+			RECT rc; 
+			GetClientRect(hWnd, &rc); 
+
 			ResizeDBISection(&BACK_BUFFER, LOWORD(lParam), HIWORD(lParam)); 
 		}break;
 
@@ -181,10 +198,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			{
 				unsigned int x = GET_X_LPARAM(lParam);
 				unsigned int y = GET_Y_LPARAM(lParam);
-				
-				//TODO change this system. Doesn`t allow to draw  in line with the palette 
 
 				// to not draw above the palette
+
 				if (x >= 40 || y >= 40)
 				{
 					ChangePixel(&BACK_BUFFER, x, y, PEN_COLOR);
@@ -254,14 +270,16 @@ HWND Init(HINSTANCE hInst, UINT width, UINT height)
 	}
 	else
 	{
-		ResizeDBISection(&BACK_BUFFER, width, height); 
+		RECT clientRect = { 0,0, width, height };
+		AdjustWindowRect(&clientRect, WS_OVERLAPPED | WS_SYSMENU | WS_SIZEBOX, FALSE);
 
 		hWnd = CreateWindow(
 			CLASS_NAME,
 			"DickDraw",
-			WS_OVERLAPPED|WS_SYSMENU,
+			WS_OVERLAPPED|WS_SYSMENU|WS_SIZEBOX,
 			100, 100,
-			width, height,
+			clientRect.right - clientRect.left,
+			clientRect.bottom - clientRect.top,
 			0,
 			0,
 			hInst,
@@ -270,21 +288,20 @@ HWND Init(HINSTANCE hInst, UINT width, UINT height)
 		ShowWindow(hWnd, SW_SHOW);
 
 	}
-
-	CreatePalete(&BACK_BUFFER); 
-
 	return hWnd; 
 
 }
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int showMode)
 {
-
+	//create window
 	HWND hWnd = Init(hInst, 800,500); 
 
+	// draw palette; 
+	CreatePalete(&BACK_BUFFER);
 
+	//main loop 
 	MSG msg;
-
 	while (!END_PROG)
 	{
 		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -296,11 +313,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, PWSTR pCmdLine, int sh
 
 		HDC hDc = GetDC(hWnd);
 
-		RECT clientRect; 
-
+		RECT clientRect;
 		GetClientRect(hWnd, &clientRect); 
 
-		DisplayBuffer(hDc,clientRect.right, clientRect.bottom, &BACK_BUFFER); 
+		DisplayBuffer(hDc,clientRect.right, clientRect.bottom, &BACK_BUFFER);
+
 		ReleaseDC(hWnd, hDc); 
 	}
 	
