@@ -1,6 +1,5 @@
 #include <Windows.h>
 #include <windowsx.h>
-#include <algorithm>
 
 #define global_var  static
 
@@ -35,23 +34,23 @@ void ResizeDBISection(BitmapBuffer* buffer, int newWidth, int newHeight)
 	int newBufferSize = newWidth * newHeight* buffer->BytesPerPixel;
 	int oldBufferSize = buffer->Height * buffer->Width * buffer->BytesPerPixel;
 
-
 	if (oldBufferSize < newBufferSize)
 	{
 		// allocate buffer with new size;
 
 		void* newMemory = VirtualAlloc(0, newBufferSize, MEM_COMMIT, PAGE_READWRITE);
 
-		UINT8* tempMemory = (UINT8*)newMemory; 
-		UINT8* bufferTempMemory = (UINT8*)buffer->Memory; 
+		UINT8* tempMemory = static_cast<UINT8*>(newMemory); 
+		UINT8* bufferTempMemory = static_cast<UINT8*>(buffer->Memory); 
 
 		if (buffer->Memory)
 		{
-			UINT64 newPitch = (UINT64)newWidth * buffer->BytesPerPixel; 
+			int  newPitch = newWidth * buffer->BytesPerPixel; 
+
 			// copy old buffer`s data to new buffer;
-			for (UINT64 y = 0; y < buffer->Height; ++y)
+			for (int y = 0; y < buffer->Height; ++y)
 			{
-				for (UINT64 x = 0; x < buffer->Width; ++x)
+				for (int x = 0; x < buffer->Width * buffer->BytesPerPixel; ++x)
 				{
 					tempMemory[y * newPitch + x] = bufferTempMemory[y * buffer->Pitch + x]; 
 				}
@@ -60,9 +59,9 @@ void ResizeDBISection(BitmapBuffer* buffer, int newWidth, int newHeight)
 			// free old buffer
 			VirtualFree(buffer->Memory, 0, MEM_RELEASE);
 
-			//make buffer memory point to new memory location
 		}
 
+		//make buffer memory point to new memory location
 		buffer->Memory = newMemory;
 		tempMemory = nullptr;
 		newMemory = nullptr;
@@ -124,8 +123,8 @@ void CreatePalete(BitmapBuffer* buffer)
 
 
 void DisplayBuffer(HDC hDc,
-	 int width, int height,
-	BitmapBuffer* buffer)
+				   int width, int height,
+				   BitmapBuffer* buffer)
 {
 	//copy data from buffer to DC
 
@@ -163,7 +162,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}break;
 
 		case WM_KEYDOWN: 
-		{
+ 		{
 			if (wParam == VK_ESCAPE)
 			{
 				PostMessage(hWnd, WM_CLOSE, 0, 0); 
